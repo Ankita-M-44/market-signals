@@ -1,0 +1,56 @@
+name: Monthly Market Signals Report
+
+on:
+  schedule:
+    - cron: '0 7 1 * *'    # 07:00 UTC on the 1st of every month
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Generate PPTX + MD as artifacts only (skip Slack + git commit)'
+        type: boolean
+        default: true
+      days_back:
+        description: 'Research window in days (default: 45)'
+        type: string
+        default: '45'
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # needed for git push of MD report
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+          DAYS_BACK: ${{ inputs.days_back || '45' }}
+        run: python pipeline.py
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-signals-${{ github.run_id }}
+          path: |
+            output_*.pptx
+            reports/output_*.md
+          retention-days: 30
+          if-no-files-found: warn
