@@ -22,7 +22,8 @@ import requests
 from groq import Groq
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.util import Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.util import Inches, Pt
 
 # ---------------------------------------------------------------------------
 # Config
@@ -30,9 +31,11 @@ from pptx.util import Pt
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-ELLI_GREEN = RGBColor(0x00, 0xD4, 0x8A)
-WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-LIGHT_GRAY = RGBColor(0xCC, 0xCC, 0xCC)
+ELLI_GREEN    = RGBColor(0x00, 0xD4, 0x8A)
+WHITE         = RGBColor(0xFF, 0xFF, 0xFF)
+LIGHT_GRAY    = RGBColor(0xBB, 0xBB, 0xBB)
+SEPARATOR     = RGBColor(0x3A, 0x3A, 0x5A)
+TEXT_ON_GREEN = RGBColor(0x05, 0x05, 0x18)
 
 GEO_FOCUS = "Europe OR Germany OR Deutschland OR EU"
 
@@ -504,8 +507,158 @@ def synthesise_report(extracted, url_map, area, products, competitors, users, ca
 
 
 # ---------------------------------------------------------------------------
-# Phase 4a — Rich PPTX generation
+# Phase 4a — Programmatic PPTX generation (all trends on one slide)
 # ---------------------------------------------------------------------------
+
+def _tb(slide, text, x, y, w, h, size, bold=False, color=WHITE, align=PP_ALIGN.LEFT, wrap=True):
+    box = slide.shapes.add_textbox(x, y, w, h)
+    tf = box.text_frame
+    tf.word_wrap = wrap
+    p = tf.paragraphs[0]
+    p.alignment = align
+    r = p.add_run()
+    r.text = text
+    r.font.size = Pt(size)
+    r.font.bold = bold
+    r.font.color.rgb = color
+    return box
+
+
+def _slide_header(slide, title, period):
+    """Clear placeholders then draw title + green accent line + period subtitle."""
+    for ph in slide.placeholders:
+        try:
+            ph.text = ""
+        except Exception:
+            pass
+    _tb(slide, title,
+        Inches(0.35), Inches(0.18), Inches(12.6), Inches(0.55),
+        size=20, bold=True, color=WHITE)
+    line = slide.shapes.add_shape(1, Inches(0.35), Inches(0.72), Inches(12.6), Inches(0.03))
+    line.fill.solid(); line.fill.fore_color.rgb = ELLI_GREEN; line.line.width = 0
+    _tb(slide, period,
+        Inches(0.35), Inches(0.76), Inches(12.6), Inches(0.28),
+        size=9, color=ELLI_GREEN)
+
+
+def draw_trends_slide(slide, trends, area_label, period):
+    _slide_header(slide, f"{area_label} — Top 5 Market Trends", period)
+
+    ROW_H   = Inches(1.18)
+    START_Y = Inches(1.12)
+    NUM_W   = Inches(0.44)
+    GAP     = Inches(0.14)
+    TEXT_X  = Inches(0.35) + NUM_W + GAP
+    TEXT_W  = Inches(12.55) - NUM_W - GAP
+
+    for i, trend in enumerate(trends[:5]):
+        y = START_Y + i * ROW_H
+
+        badge = slide.shapes.add_shape(5, Inches(0.35), y + Inches(0.22), NUM_W, NUM_W)
+        badge.fill.solid(); badge.fill.fore_color.rgb = ELLI_GREEN; badge.line.width = 0
+        btf = badge.text_frame; btf.word_wrap = False
+        bp = btf.paragraphs[0]; bp.alignment = PP_ALIGN.CENTER
+        br = bp.add_run(); br.text = str(i + 1)
+        br.font.bold = True; br.font.size = Pt(13); br.font.color.rgb = TEXT_ON_GREEN
+
+        _tb(slide, trend.get("title", ""),
+            TEXT_X, y + Inches(0.10), TEXT_W, Inches(0.38),
+            size=11, bold=True, color=WHITE, wrap=False)
+
+        signal  = (trend.get("signal", "") or "").strip()
+        impl    = (trend.get("implication", "") or "").strip()
+        desc = signal
+        if impl and len(desc) < 220:
+            desc = desc.rstrip(".") + ". " + impl if desc else impl
+        desc = (desc or (trend.get("meaning", "") or "").strip())[:320]
+
+        _tb(slide, desc,
+            TEXT_X, y + Inches(0.48), TEXT_W, Inches(0.62),
+            size=8.5, color=LIGHT_GRAY, wrap=True)
+
+        if i < 4:
+            sep = slide.shapes.add_shape(1,
+                Inches(0.35), y + ROW_H - Inches(0.04),
+                Inches(12.6), Inches(0.015))
+            sep.fill.solid(); sep.fill.fore_color.rgb = SEPARATOR; sep.line.width = 0
+
+
+def draw_list_slide(slide, title, items, period, item_fn):
+    _slide_header(slide, title, period)
+    y = Inches(1.10)
+    for item in items:
+        used = item_fn(slide, item, y)
+        y += used + Inches(0.12)
+        if y > Inches(7.0):
+            break
+
+
+def _competitor_item(slide, item, y):
+    company = item.get("company", "")
+    action  = item.get("action", "")
+    detail  = item.get("detail", "")
+    label   = f"{company}: {action}" if company else action
+    _tb(slide, f"▸ {label}",
+        Inches(0.35), y, Inches(12.6), Inches(0.35),
+        size=10, bold=True, color=ELLI_GREEN)
+    if detail:
+        _tb(slide, detail,
+            Inches(0.55), y + Inches(0.35), Inches(12.4), Inches(0.55),
+            size=9, color=LIGHT_GRAY, wrap=True)
+        return Inches(0.9)
+    return Inches(0.35)
+
+
+def _need_item(slide, item, y):
+    need     = item.get("need", "")
+    evidence = item.get("evidence", "")
+    _tb(slide, f"● {need}",
+        Inches(0.35), y, Inches(12.6), Inches(0.35),
+        size=10, bold=True, color=ELLI_GREEN)
+    if evidence:
+        _tb(slide, evidence,
+            Inches(0.55), y + Inches(0.35), Inches(12.4), Inches(0.55),
+            size=9, color=LIGHT_GRAY, wrap=True)
+        return Inches(0.9)
+    return Inches(0.35)
+
+
+def _reg_item(slide, item, y):
+    reg    = item.get("regulation", "")
+    status = item.get("status", "")
+    impact = item.get("impact", "")
+    header = f"▸ {reg}" + (f"  [{status}]" if status else "")
+    _tb(slide, header,
+        Inches(0.35), y, Inches(12.6), Inches(0.35),
+        size=10, bold=True, color=ELLI_GREEN)
+    if impact:
+        _tb(slide, impact,
+            Inches(0.55), y + Inches(0.35), Inches(12.4), Inches(0.6),
+            size=9, color=LIGHT_GRAY, wrap=True)
+        return Inches(0.95)
+    return Inches(0.35)
+
+
+def _impl_item(slide, item, y):
+    impl      = item.get("implication", "")
+    rationale = item.get("rationale", "")
+    _tb(slide, f"→ {impl}",
+        Inches(0.35), y, Inches(12.6), Inches(0.35),
+        size=10, bold=True, color=ELLI_GREEN)
+    if rationale:
+        _tb(slide, rationale,
+            Inches(0.55), y + Inches(0.35), Inches(12.4), Inches(0.6),
+            size=9, color=LIGHT_GRAY, wrap=True)
+        return Inches(0.95)
+    return Inches(0.35)
+
+
+def _question_item(slide, item, y):
+    _tb(slide, f"? {item.get('text', '')}",
+        Inches(0.35), y, Inches(12.6), Inches(0.38),
+        size=10, color=WHITE, wrap=True)
+    return Inches(0.38)
+
 
 def _clear_and_set_placeholder(slide, idx, text):
     for ph in slide.placeholders:
@@ -690,68 +843,65 @@ def fill_implications_slide(slide, items, subtitle):
 
 
 def fill_pptx(template_path, output_path, fleet_report, site_report, dates):
-    """Fill the 22-slide template with rich formatted content."""
-    prs = Presentation(template_path)
+    """Fill the 14-slide template with programmatically drawn content."""
+    prs    = Presentation(template_path)
     slides = list(prs.slides)
     period = f"{dates['period_start']} – {dates['period_end']}"
 
-    # Slide 0: Cover — simple text replace
+    # Slide 0: Cover
     for shape in slides[0].shapes:
         if shape.has_text_frame:
             for para in shape.text_frame.paragraphs:
                 for run in para.runs:
-                    run.text = run.text.replace("{{GENERATED_AT}}", dates["generated_at"])
-                    run.text = run.text.replace("{{PERIOD_START}}", dates["period_start"])
-                    run.text = run.text.replace("{{PERIOD_END}}", dates["period_end"])
+                    run.text = (run.text
+                        .replace("{{GENERATED_AT}}", dates["generated_at"])
+                        .replace("{{PERIOD_START}}", dates["period_start"])
+                        .replace("{{PERIOD_END}}",   dates["period_end"]))
 
-    # Slides 2–6: Fleet Trends (individual)
-    for i, trend in enumerate(fleet_report["trends"][:5]):
-        fill_trend_slide(slides[2 + i], trend, i + 1, 5, "Fleet Mobility Management")
+    # Slide 2: Fleet Trends (all 5 on one slide)
+    draw_trends_slide(slides[2], fleet_report["trends"],
+                      "Fleet Mobility Management", period)
 
-    # Slide 7: Fleet Competitor Moves
-    fill_competitor_slide(slides[7], fleet_report["competitor_moves"], period)
+    # Slide 3: Fleet Competitor Moves
+    draw_list_slide(slides[3], "Fleet Mobility — Competitor Moves",
+                    fleet_report["competitor_moves"], period, _competitor_item)
 
-    # Slide 8: Fleet Unmet Needs
-    fill_needs_slide(slides[8], fleet_report["unmet_needs"], period)
+    # Slide 4: Fleet Unmet Customer Needs
+    draw_list_slide(slides[4], "Fleet Mobility — Unmet Customer Needs",
+                    fleet_report["unmet_needs"], period, _need_item)
 
-    # Slide 9: Fleet Active Regulations
-    fill_regulations_slide(slides[9], fleet_report["active_regulations"], period)
+    # Slide 5: Fleet Active Regulations
+    draw_list_slide(slides[5], "Fleet Mobility — Active Regulations",
+                    fleet_report["active_regulations"], period, _reg_item)
 
-    # Slide 10: Fleet Strategic Implications
-    fill_implications_slide(slides[10], fleet_report["strategic_implications"], period)
+    # Slide 6: Fleet Strategic Implications
+    draw_list_slide(slides[6], "Fleet Mobility — Strategic Implications for Elli",
+                    fleet_report["strategic_implications"], period, _impl_item)
 
-    # Slides 12–16: Site Trends (individual)
-    for i, trend in enumerate(site_report["trends"][:5]):
-        fill_trend_slide(slides[12 + i], trend, i + 1, 5, "Charging Site Management")
+    # Slide 8: Site Trends (all 5 on one slide)
+    draw_trends_slide(slides[8], site_report["trends"],
+                      "Charging Site Management", period)
 
-    # Slide 17: Site Competitor Moves
-    fill_competitor_slide(slides[17], site_report["competitor_moves"], period)
+    # Slide 9: Site Competitor Moves
+    draw_list_slide(slides[9], "Charging Site — Competitor Moves",
+                    site_report["competitor_moves"], period, _competitor_item)
 
-    # Slide 18: Site Unmet Needs
-    fill_needs_slide(slides[18], site_report["unmet_needs"], period)
+    # Slide 10: Site Unmet Customer Needs
+    draw_list_slide(slides[10], "Charging Site — Unmet Customer Needs",
+                    site_report["unmet_needs"], period, _need_item)
 
-    # Slide 19: Site Active Regulations
-    fill_regulations_slide(slides[19], site_report["active_regulations"], period)
+    # Slide 11: Site Active Regulations
+    draw_list_slide(slides[11], "Charging Site — Active Regulations",
+                    site_report["active_regulations"], period, _reg_item)
 
-    # Slide 20: Site Strategic Implications
-    fill_implications_slide(slides[20], site_report["strategic_implications"], period)
+    # Slide 12: Site Strategic Implications
+    draw_list_slide(slides[12], "Charging Site — Strategic Implications for Elli",
+                    site_report["strategic_implications"], period, _impl_item)
 
-    # Slide 21: Open Questions
-    all_questions = fleet_report["open_questions"] + site_report["open_questions"]
-    for ph in slides[21].placeholders:
-        if ph.placeholder_format.idx == 15:
-            tf = ph.text_frame
-            tf.clear()
-            tf.word_wrap = True
-            first = True
-            for q in all_questions:
-                p = tf.paragraphs[0] if first else tf.add_paragraph()
-                p.space_before = Pt(4)
-                r = p.add_run()
-                r.text = f"? {q.get('text', '')}"
-                r.font.size = Pt(10)
-                r.font.color.rgb = WHITE
-                first = False
+    # Slide 13: Open Questions
+    draw_list_slide(slides[13], "Open Questions for Follow-up",
+                    fleet_report["open_questions"] + site_report["open_questions"],
+                    period, _question_item)
 
     prs.save(output_path)
 

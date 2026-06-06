@@ -1,7 +1,23 @@
 """
-One-time script: generates template.pptx (22 slides) from Elli corporate template.
+One-time script: generates template.pptx (14 slides) from Elli corporate template.
 Run: python create_template.py
 Then commit the resulting template.pptx to the repo.
+
+Slide index map (must match fill_pptx() in pipeline.py):
+  0  Cover              6_Chapter Page / Break
+  1  Fleet divider      Dark background empty
+  2  Fleet Trends       Dark background empty  <- drawn programmatically
+  3  Fleet Competitors  Dark background empty  <- drawn programmatically
+  4  Fleet Needs        Dark background empty  <- drawn programmatically
+  5  Fleet Regulations  Dark background empty  <- drawn programmatically
+  6  Fleet Implications Dark background empty  <- drawn programmatically
+  7  Site divider       Dark background empty
+  8  Site Trends        Dark background empty  <- drawn programmatically
+  9  Site Competitors   Dark background empty  <- drawn programmatically
+  10 Site Needs         Dark background empty  <- drawn programmatically
+  11 Site Regulations   Dark background empty  <- drawn programmatically
+  12 Site Implications  Dark background empty  <- drawn programmatically
+  13 Open Questions     Dark background empty  <- drawn programmatically
 """
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -12,7 +28,7 @@ SOURCE = "Elli_Mobility_PP_Template_2.0.pptx"
 OUTPUT = "template.pptx"
 
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-GREEN = RGBColor(0x00, 0xD4, 0x8A)
+ELLI_GREEN = RGBColor(0x00, 0xD4, 0x8A)
 
 
 def remove_all_slides(prs):
@@ -37,22 +53,9 @@ def set_ph(slide, idx, text):
             return
 
 
-def add_content_slide(prs, layout, title, body_placeholder, subtitle=None):
-    slide = prs.slides.add_slide(layout)
-    set_ph(slide, 0, title)
-    set_ph(slide, 15, body_placeholder)
-    if subtitle is not None:
-        try:
-            set_ph(slide, 4, subtitle)
-        except Exception:
-            pass
-    return slide
-
-
 def add_section_divider(prs, layout, section_title, section_number):
-    """Dark section break slide matching the Elli source template style."""
+    """Dark section break slide with large title and section number."""
     slide = prs.slides.add_slide(layout)
-    # Large section title (72pt bold white, same position as source slide 3)
     tb = slide.shapes.add_textbox(
         Inches(1.92), Inches(2.29), Inches(9.52), Inches(2.41)
     )
@@ -64,7 +67,6 @@ def add_section_divider(prs, layout, section_title, section_number):
     run.font.size = Pt(72)
     run.font.bold = True
     run.font.color.rgb = WHITE
-    # Section number (large, left side)
     nb = slide.shapes.add_textbox(
         Inches(0.57), Inches(2.06), Inches(1.40), Inches(2.86)
     )
@@ -82,122 +84,37 @@ def main():
     prs = Presentation(SOURCE)
     remove_all_slides(prs)
 
-    dark_content = get_layout(prs, "Dark background content")
     dark_empty = get_layout(prs, "Dark background empty")
-    chapter = get_layout(prs, "6_Chapter Page / Break")
-    light_content = get_layout(prs, "Light background content")
+    chapter    = get_layout(prs, "6_Chapter Page / Break")
 
-    # ── Slide 0: Cover ─────────────────────────────────────────────────────
+    # Slide 0: Cover
     slide = prs.slides.add_slide(chapter)
     set_ph(slide, 0, "Market Signals — {{GENERATED_AT}}")
     set_ph(slide, 15, "Research period: {{PERIOD_START}} – {{PERIOD_END}}")
 
-    # ── Slide 1: Fleet section divider ─────────────────────────────────────
+    # Slide 1: Fleet section divider
     add_section_divider(prs, dark_empty, "Fleet Mobility\nManagement", "1")
 
-    # ── Slides 2–6: Fleet Trends (one per trend) ───────────────────────────
-    for n in range(1, 6):
-        add_content_slide(
-            prs, dark_content,
-            title=f"Fleet — Trend {n} of 5",
-            subtitle=f"Trend {n} of 5  ·  Fleet Mobility Management",
-            body_placeholder="[Signal, meaning and implication will be filled by pipeline]",
-        )
+    # Slides 2-6: Fleet content (drawn programmatically by pipeline)
+    for _ in range(5):
+        prs.slides.add_slide(dark_empty)
 
-    # ── Slide 7: Fleet Competitor Moves ────────────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Fleet Mobility — Competitor Moves",
-        subtitle="",
-        body_placeholder="[Competitor moves will be filled by pipeline]",
-    )
-
-    # ── Slide 8: Fleet Unmet Customer Needs ────────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Fleet Mobility — Unmet Customer Needs",
-        subtitle="",
-        body_placeholder="[Unmet needs will be filled by pipeline]",
-    )
-
-    # ── Slide 9: Fleet Active Regulations ──────────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Fleet Mobility — Active Regulations",
-        subtitle="",
-        body_placeholder="[Regulations will be filled by pipeline]",
-    )
-
-    # ── Slide 10: Fleet Strategic Implications ─────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Fleet Mobility — Strategic Implications for Elli",
-        subtitle="",
-        body_placeholder="[Strategic implications will be filled by pipeline]",
-    )
-
-    # ── Slide 11: Site section divider ─────────────────────────────────────
+    # Slide 7: Site section divider
     add_section_divider(prs, dark_empty, "Charging Site\nManagement", "2")
 
-    # ── Slides 12–16: Site Trends (one per trend) ──────────────────────────
-    for n in range(1, 6):
-        add_content_slide(
-            prs, dark_content,
-            title=f"Site — Trend {n} of 5",
-            subtitle=f"Trend {n} of 5  ·  Charging Site Management",
-            body_placeholder="[Signal, meaning and implication will be filled by pipeline]",
-        )
-
-    # ── Slide 17: Site Competitor Moves ────────────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Charging Site — Competitor Moves",
-        subtitle="",
-        body_placeholder="[Competitor moves will be filled by pipeline]",
-    )
-
-    # ── Slide 18: Site Unmet Customer Needs ────────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Charging Site — Unmet Customer Needs",
-        subtitle="",
-        body_placeholder="[Unmet needs will be filled by pipeline]",
-    )
-
-    # ── Slide 19: Site Active Regulations ──────────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Charging Site — Active Regulations",
-        subtitle="",
-        body_placeholder="[Regulations will be filled by pipeline]",
-    )
-
-    # ── Slide 20: Site Strategic Implications ──────────────────────────────
-    add_content_slide(
-        prs, dark_content,
-        title="Charging Site — Strategic Implications for Elli",
-        subtitle="",
-        body_placeholder="[Strategic implications will be filled by pipeline]",
-    )
-
-    # ── Slide 21: Open Questions ────────────────────────────────────────────
-    add_content_slide(
-        prs, light_content,
-        title="Open Questions for Follow-up",
-        subtitle="",
-        body_placeholder="[Open questions will be filled by pipeline]",
-    )
+    # Slides 8-13: Site content (drawn programmatically by pipeline)
+    for _ in range(6):
+        prs.slides.add_slide(dark_empty)
 
     prs.save(OUTPUT)
-    print(f"✓ Saved {OUTPUT} with {len(prs.slides)} slides")
-    print("Slides:")
+    print(f"Saved {OUTPUT} with {len(prs.slides)} slides")
     for i, slide in enumerate(prs.slides):
         texts = [
             s.text_frame.text[:60].replace('\n', ' ')
             for s in slide.shapes
             if s.has_text_frame and s.text_frame.text.strip()
         ]
-        print(f"  {i:2d}: {' | '.join(texts[:2])}")
+        print(f"  {i:2d}: {' | '.join(texts[:2]) or '(empty canvas)'}")
 
 
 if __name__ == "__main__":
