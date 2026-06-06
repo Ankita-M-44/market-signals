@@ -18,7 +18,6 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import requests
-from duckduckgo_search import DDGS
 from groq import Groq
 from pptx import Presentation
 
@@ -147,20 +146,35 @@ def compute_date_range():
 # Phase 1 — Research
 # ---------------------------------------------------------------------------
 
-def search_ddg(query, max_results=4):
-    """Single DuckDuckGo query; returns list of {idx,title,snippet,url}."""
-    results = []
+def search_serper(query, max_results=5):
+    """
+    Search via Serper.dev Google News API.
+    Free tier: 2500 queries/month, no credit card required.
+    Requires SERPER_API_KEY environment variable.
+    """
     try:
-        with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=max_results):
-                results.append({
-                    "title": r.get("title", ""),
-                    "snippet": (r.get("body", "") or "")[:400],
-                    "url": r.get("href", ""),
-                })
+        resp = requests.post(
+            "https://google.serper.dev/news",
+            headers={
+                "X-API-KEY": os.environ["SERPER_API_KEY"],
+                "Content-Type": "application/json",
+            },
+            json={"q": query, "num": max_results},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        results = []
+        for r in data.get("news", []):
+            results.append({
+                "title": r.get("title", ""),
+                "snippet": (r.get("snippet", "") or "")[:400],
+                "url": r.get("link", ""),
+            })
+        return results
     except Exception as e:
-        print(f"  search warning: {e}", file=sys.stderr)
-    return results
+        print(f"  search warning [{query[:50]}]: {e}", file=sys.stderr)
+        return []
 
 
 def run_searches(categories, month_range):
@@ -168,11 +182,10 @@ def run_searches(categories, month_range):
     results = {}
     for i, (category, query_template) in enumerate(categories, 1):
         query = query_template.replace("{m}", month_range)
-        print(f"  [{i}/{len(categories)}] {category[:50]}...")
-        hits = search_ddg(query)
+        hits = search_serper(query)
         indexed = [{"idx": j + 1, **h} for j, h in enumerate(hits)]
         results[category] = indexed
-        time.sleep(1.5)
+        print(f"  [{i}/{len(categories)}] {category[:50]}: {len(hits)} results")
     return results
 
 

@@ -30,6 +30,7 @@ In **Settings → Secrets and variables → Actions → Repository secrets**, ad
 | Secret | How to get it |
 |---|---|
 | `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) → API Keys |
+| `SERPER_API_KEY` | [serper.dev](https://serper.dev) → Sign up free (email only, no credit card) → Dashboard → API Key |
 | `SLACK_BOT_TOKEN` | [api.slack.com/apps](https://api.slack.com/apps) → create app → OAuth & Permissions → add `files:write` + `chat:write` scopes → Install to workspace → copy the `xoxb-...` token |
 | `SLACK_CHANNEL_ID` | In Slack: right-click your target channel → Copy link → the last path segment is the channel ID (e.g. `C1234567890`) |
 
