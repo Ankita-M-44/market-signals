@@ -3,6 +3,7 @@ Market Signals pipeline — research, analyse, generate PPTX + MD, post to Slack
 
 Environment variables:
   GROQ_API_KEY       required
+  SERPER_API_KEY     required
   SLACK_BOT_TOKEN    required unless DRY_RUN=true
   SLACK_CHANNEL_ID   required unless DRY_RUN=true
   GITHUB_TOKEN       required unless DRY_RUN=true (for committing MD report)
@@ -20,12 +21,20 @@ from pathlib import Path
 import requests
 from groq import Groq
 from pptx import Presentation
+from pptx.dml.color import RGBColor
+from pptx.util import Pt
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
+
+ELLI_GREEN = RGBColor(0x00, 0xD4, 0x8A)
+WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+LIGHT_GRAY = RGBColor(0xCC, 0xCC, 0xCC)
+
+GEO_FOCUS = "Europe OR Germany OR Deutschland OR EU"
 
 FLEET_PRODUCTS = (
     "Fleet Charging Console, Charging Card, Home Charging Reimbursement, "
@@ -46,60 +55,77 @@ SITE_COMPETITORS = (
 )
 SITE_USERS = "Commercial Property Owners, Dealers, Facilities Managers"
 
+# Primary competitors get dedicated queries in addition to category queries.
+FLEET_COMPETITOR_QUERIES = [
+    ("DKV Mobility fleet EV charging card Europe {m}", "Competitor card and MSP moves"),
+    ("UTA Edenred fleet EV charging card Europe {m}", "Competitor card and MSP moves"),
+    ("Shell Recharge BP Pulse fleet charging Europe {m}", "Competitor card and MSP moves"),
+    ("EnBW Aral fleet EV charging card Germany {m}", "Competitor card and MSP moves"),
+    ("Octopus Energy fleet charging Europe {m}", "Competitor card and MSP moves"),
+]
+
+SITE_COMPETITOR_QUERIES = [
+    ("Driivz AMPECO CPMS EV charging software Europe {m}", "CPMS platform competition and consolidation"),
+    ("Monta Virta charging management platform Europe {m}", "CPMS platform competition and consolidation"),
+    ("ChargePoint E.On EnBW charging site management Europe {m}", "CPMS platform competition and consolidation"),
+    ("The Mobility House ChargePilot EV site management Europe {m}", "CPMS platform competition and consolidation"),
+    ("Moon EV charging platform Europe {m}", "CPMS platform competition and consolidation"),
+]
+
 FLEET_CATEGORIES = [
     ("Pricing model and subscription evolution",
-     "fleet EV charging card fee kWh tariff pricing {m}"),
+     f"fleet EV charging card fee kWh tariff pricing {GEO_FOCUS} {{m}}"),
     ("Network access and roaming coverage",
-     "eRoaming IONITY fleet charging network HPC partnership {m}"),
+     f"eRoaming IONITY fleet charging network HPC partnership {GEO_FOCUS} {{m}}"),
     ("Mixed-fleet and ICE-to-EV transition",
-     "fuel card electrification ICE EV combined billing fleet {m}"),
+     f"fuel card electrification ICE EV combined billing fleet {GEO_FOCUS} {{m}}"),
     ("Home charging reimbursement and compliance",
-     "home charging reimbursement kWh mandate wallbox fleet {m}"),
+     f"home charging reimbursement kWh mandate wallbox fleet {GEO_FOCUS} {{m}}"),
     ("Plug&Charge and authentication technology",
-     "ISO 15118 Plug&Charge RFID fleet authentication {m}"),
+     f"ISO 15118 Plug&Charge RFID fleet authentication Europe {{m}}"),
     ("Mobile payment and in-app fuelling",
-     "mobile app payment fuelling fleet digital receipt {m}"),
+     f"mobile app payment fuelling fleet Germany Europe {{m}}"),
     ("Employee benefit and non-cash incentive regulation",
-     "fleet benefit card tax-free EV charging social security exemption {m}"),
+     f"fleet benefit card Dienstwagen Steuervorteil EV charging Germany {{m}}"),
     ("Data, reporting and CO2 transparency",
-     "CSRD fleet Scope 3 CO2 EV charging reporting dashboard {m}"),
+     f"CSRD fleet Scope 3 CO2 EV reporting Fuhrpark Germany Europe {{m}}"),
     ("Fleet software consolidation and platform convergence",
-     "CPMS fleet card integration unified platform merger {m}"),
+     f"CPMS fleet card integration unified platform merger Europe {{m}}"),
     ("Commercial vehicle and HGV electrification",
-     "HGV truck LCV fleet EV charging infrastructure {m}"),
+     f"LKW Nutzfahrzeuge electric HGV LCV fleet charging Germany Europe {{m}}"),
     ("Competitor card and MSP moves",
-     "DKV UTA Shell BP EnBW Aral Octopus fleet EV charging news {m}"),
+     f"DKV UTA Shell BP EnBW Aral Fuhrpark EV Ladekarte news {GEO_FOCUS} {{m}}"),
     ("Regulatory and compliance obligations",
-     "AFIR fleet ZEV mandate GDPR fleet card regulation {m}"),
+     f"AFIR fleet electrification regulation Germany EU {{m}}"),
     ("Customer pain points",
-     "fleet manager EV charging problems unmet needs survey {m}"),
+     f"fleet manager EV charging Fuhrpark problems Germany Europe {{m}}"),
 ]
 
 SITE_CATEGORIES = [
     ("CPMS platform competition and consolidation",
-     "Driivz Ampeco Monta Virta ChargePoint CPMS news contract {m}"),
+     f"Driivz Ampeco Monta Virta ChargePoint CPMS Europe {{m}}"),
     ("Energy management and grid integration",
-     "EV charging load management V2G demand response site {m}"),
+     f"EV charging Energiemanagement V2G demand response site Germany Europe {{m}}"),
     ("Hardware ecosystem and multi-vendor compatibility",
-     "OCPP 2.0.1 Alpitronic Compleo charger integration {m}"),
+     f"OCPP 2.0.1 Alpitronic Compleo Mennekes charger integration Europe {{m}}"),
     ("Site planning and installation market",
-     "EV charging site planning grid connection permit cost {m}"),
+     f"EV charging site Planung Netzanschluss permit cost Germany Europe {{m}}"),
     ("Public charging monetisation",
-     "CPO ad-hoc payment AFIR eRoaming revenue CPO {m}"),
+     f"CPO Ladesäule ad-hoc payment AFIR eRoaming revenue Europe {{m}}"),
     ("Building and property regulation",
-     "EPBD pre-cabling commercial building EV charging permit {m}"),
+     f"EPBD Gebäudeenergiegesetz pre-cabling building EV charging Germany Europe {{m}}"),
     ("CPO data and reporting obligations",
-     "DATEX II CPO static dynamic data compliance {m}"),
+     f"DATEX II CPO Bundesnetzagentur data compliance Germany {{m}}"),
     ("Maintenance, uptime and operations",
-     "EV charging uptime remote diagnostics firmware SLA {m}"),
+     f"EV charging Verfügbarkeit remote diagnostics maintenance Germany Europe {{m}}"),
     ("AI and software-driven site operations",
-     "AI predictive maintenance EV charging autonomous network {m}"),
+     f"AI predictive maintenance EV charging autonomous network Europe {{m}}"),
     ("Segment-specific site demand",
-     "retail depot parking municipality EV charging site {m}"),
+     f"retail Gewerbe depot parking EV charging Germany Europe {{m}}"),
     ("Fleet and site convergence",
-     "fleet site unified EV charging console integration {m}"),
+     f"fleet site unified EV charging console integration Europe {{m}}"),
     ("Sustainability and carbon reporting at site level",
-     "CO2 kWh renewable energy CSRD site charging sustainability {m}"),
+     f"CO2 kWh renewable CSRD site charging Nachhaltigkeit Germany {{m}}"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -146,12 +172,8 @@ def compute_date_range():
 # Phase 1 — Research
 # ---------------------------------------------------------------------------
 
-def search_serper(query, max_results=5):
-    """
-    Search via Serper.dev Google News API.
-    Free tier: 2500 queries/month, no credit card required.
-    Requires SERPER_API_KEY environment variable.
-    """
+def search_serper(query, max_results=6):
+    """Search via Serper.dev Google News. Free tier: 2500 queries/month."""
     try:
         resp = requests.post(
             "https://google.serper.dev/news",
@@ -159,17 +181,18 @@ def search_serper(query, max_results=5):
                 "X-API-KEY": os.environ["SERPER_API_KEY"],
                 "Content-Type": "application/json",
             },
-            json={"q": query, "num": max_results},
+            json={"q": query, "num": max_results, "gl": "de", "hl": "en"},
             timeout=15,
         )
         resp.raise_for_status()
-        data = resp.json()
         results = []
-        for r in data.get("news", []):
+        for r in resp.json().get("news", []):
             results.append({
                 "title": r.get("title", ""),
-                "snippet": (r.get("snippet", "") or "")[:400],
+                "snippet": (r.get("snippet", "") or "")[:500],
                 "url": r.get("link", ""),
+                "source": r.get("source", ""),
+                "date": r.get("date", ""),
             })
         return results
     except Exception as e:
@@ -177,20 +200,41 @@ def search_serper(query, max_results=5):
         return []
 
 
-def run_searches(categories, month_range):
-    """Run all searches; return {category: [{idx,title,snippet,url}]}."""
+def run_searches(categories, competitor_queries, month_range):
+    """
+    Run all category searches plus dedicated competitor queries.
+    Returns {category: [{idx,title,snippet,url,source,date}]}
+    """
     results = {}
+
+    # Category queries
     for i, (category, query_template) in enumerate(categories, 1):
         query = query_template.replace("{m}", month_range)
         hits = search_serper(query)
         indexed = [{"idx": j + 1, **h} for j, h in enumerate(hits)]
-        results[category] = indexed
+        # Merge into category bucket
+        results.setdefault(category, [])
+        existing_count = len(results[category])
+        for h in indexed:
+            h["idx"] = existing_count + h["idx"]
+            results[category].append(h)
         print(f"  [{i}/{len(categories)}] {category[:50]}: {len(hits)} results")
+
+    # Competitor-specific queries — merge into their category bucket
+    for query_template, target_category in competitor_queries:
+        query = query_template.replace("{m}", month_range)
+        hits = search_serper(query, max_results=4)
+        if hits:
+            results.setdefault(target_category, [])
+            existing_count = len(results[target_category])
+            for j, h in enumerate(hits):
+                results[target_category].append({"idx": existing_count + j + 1, **h})
+
     return results
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 — Extract signals (Groq × 6 calls)
+# Phase 2 — Extract signals (Groq × batched calls)
 # ---------------------------------------------------------------------------
 
 _groq_client = None
@@ -203,7 +247,7 @@ def groq_client():
     return _groq_client
 
 
-def call_groq(system_prompt, user_prompt):
+def call_groq(system_prompt, user_prompt, max_tokens=3000):
     """Call Groq in JSON mode; return parsed dict."""
     resp = groq_client().chat.completions.create(
         model=GROQ_MODEL,
@@ -213,7 +257,7 @@ def call_groq(system_prompt, user_prompt):
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.3,
-        max_tokens=2048,
+        max_tokens=max_tokens,
     )
     return json.loads(resp.choices[0].message.content)
 
@@ -221,46 +265,44 @@ def call_groq(system_prompt, user_prompt):
 def _format_snippets_for_prompt(category, hits):
     lines = [f"--- {category} ---"]
     for h in hits:
-        lines.append(f"[{h['idx']}] {h['title']}")
+        source_info = f" ({h.get('source', '')} {h.get('date', '')})" if h.get("source") else ""
+        lines.append(f"[{h['idx']}] {h['title']}{source_info}")
         lines.append(f"URL: {h['url']}")
         lines.append(h["snippet"])
         lines.append("")
     return "\n".join(lines)
 
 
-EXTRACT_SYSTEM = """You extract concrete market signals from EV charging industry search results.
-Be factual and specific — only report what the search results actually contain.
-Do not invent signals not supported by the text."""
+EXTRACT_SYSTEM = (
+    "You extract concrete market signals from EV charging industry search results "
+    "focused on the European market (Germany, Austria, Spain, Italy, France and EU). "
+    "Be factual and specific — only report what the search results actually contain. "
+    "Include company names, countries, and specific details where available. "
+    "Do not invent signals not supported by the text."
+)
 
 
 def extract_signals(results_by_category, batch_size=4):
-    """
-    Extract concrete signals per category using batched Groq calls.
-    Returns {category: [{signal: str, sources: [int]}]}
-    """
+    """Extract concrete signals per category; returns {category: [{signal,sources}]}"""
     categories = list(results_by_category.keys())
     batches = [categories[i:i + batch_size] for i in range(0, len(categories), batch_size)]
     extracted = {}
 
     for b_idx, batch in enumerate(batches, 1):
         print(f"  extract batch {b_idx}/{len(batches)} ({len(batch)} categories)...")
-
         snippets_text = "\n".join(
             _format_snippets_for_prompt(cat, results_by_category[cat])
             for cat in batch
         )
-
         schema_example = {cat: [{"signal": "...", "sources": [1]}] for cat in batch}
         user_prompt = (
-            f"Extract 2–3 concrete signals for each of these categories: "
-            f"{', '.join(batch)}.\n\n"
-            f"A signal is a specific product launch, pricing move, regulatory change, "
-            f"partnership announcement, or verified customer pain point.\n\n"
-            f"Return JSON matching this schema exactly:\n"
-            f"{json.dumps(schema_example, indent=2)}\n\n"
+            f"Extract 2–4 concrete signals for each category: {', '.join(batch)}.\n\n"
+            f"A signal = a specific product launch, pricing move, regulatory update, "
+            f"partnership, competitor action, or customer pain point. "
+            f"Include company names and countries.\n\n"
+            f"Return JSON:\n{json.dumps(schema_example, indent=2)}\n\n"
             f"Search results:\n{snippets_text}"
         )
-
         try:
             data = call_groq(EXTRACT_SYSTEM, user_prompt)
             for cat in batch:
@@ -269,14 +311,12 @@ def extract_signals(results_by_category, batch_size=4):
             print(f"  extract error batch {b_idx}: {e}", file=sys.stderr)
             for cat in batch:
                 extracted[cat] = []
-
         time.sleep(1.0)
 
     return extracted
 
 
 def build_url_map(results_by_category):
-    """Build {(category, idx): url} lookup."""
     url_map = {}
     for cat, hits in results_by_category.items():
         for h in hits:
@@ -284,54 +324,79 @@ def build_url_map(results_by_category):
     return url_map
 
 
-def resolve_urls(signals_with_sources, category, url_map):
-    """Replace source index numbers with actual URLs."""
-    resolved = []
-    for item in signals_with_sources:
-        urls = [
-            url_map.get((category, src), "")
-            for src in item.get("sources", [])
-            if url_map.get((category, src), "")
-        ]
-        resolved.append({"text": item["signal"], "urls": urls})
-    return resolved
-
-
 # ---------------------------------------------------------------------------
 # Phase 3 — Synthesise report (Groq × 2 calls)
 # ---------------------------------------------------------------------------
 
-SYNTH_SYSTEM_TEMPLATE = """You are a strategic analyst for Elli, a Volkswagen Group EV charging company.
+SYNTH_SYSTEM_TEMPLATE = """\
+You are a senior market research analyst for Elli, a Volkswagen Group EV charging company \
+operating primarily in Germany and Europe.
 
-{area} Products: {products}
-Key Competitors: {competitors}
+{area}
+Products: {products}
+Key B2B Competitors: {competitors}
 Primary Users: {users}
+Geographic focus: Germany (primary), Austria, Spain, Italy, France, EU
 
-Analyse the provided market signals (collected over the past 30–45 days) and produce
-the monthly Market Signals report section for {area}.
+Analyse the provided market signals (past 30–45 days) and produce a detailed \
+monthly Market Signals report for {area}. \
+Write with the depth of a professional market research report — each item should \
+explain WHAT the signal is, WHAT IT MEANS for the market, and what the implication \
+is for Elli. Be specific: name companies, geographies, and figures where available.
 
-Return ONLY valid JSON with this exact schema:
+Return ONLY valid JSON with this EXACT schema (no extra keys):
 {{
   "trends": [
-    {{"title": "...", "description": "2–3 sentences max 180 chars", "sources": [1,2]}},
-    ...
+    {{
+      "title": "Short headline (6–10 words)",
+      "signal": "What is specifically happening — 3–4 sentences with company names, countries, and concrete details",
+      "meaning": "Why this matters for the European EV charging market — 2–3 sentences on market direction",
+      "implication": "What Elli should monitor, consider or act on — 1–2 sentences",
+      "sources": [1, 2]
+    }}
   ],
-  "competitor_moves": [{{"text": "...", "sources": [1]}}],
-  "unmet_needs": [{{"text": "...", "sources": [1]}}],
-  "active_regulations": [{{"text": "...", "sources": [1]}}],
-  "strategic_implications": [{{"text": "..."}}],
-  "open_questions": [{{"text": "..."}}]
+  "competitor_moves": [
+    {{
+      "company": "Competitor name",
+      "action": "One-line summary of what they did",
+      "detail": "2–3 sentences: context, geography, and why it matters competitively",
+      "sources": [1]
+    }}
+  ],
+  "unmet_needs": [
+    {{
+      "need": "The unmet need in one line",
+      "evidence": "What the research shows — 2–3 sentences",
+      "sources": [1]
+    }}
+  ],
+  "active_regulations": [
+    {{
+      "regulation": "Regulation or policy name",
+      "status": "Current implementation status",
+      "impact": "Impact on fleet/site charging in Europe — 2–3 sentences",
+      "sources": [1]
+    }}
+  ],
+  "strategic_implications": [
+    {{
+      "implication": "Strategic recommendation or watch item for Elli",
+      "rationale": "Why now and what the risk/opportunity is — 2–3 sentences"
+    }}
+  ],
+  "open_questions": [
+    {{"text": "A specific question for PM follow-up or further research"}}
+  ]
 }}
 
-Produce exactly 5 trends, 3–5 items in each other list."""
+Produce exactly 5 trends. 3–5 items per other section. \
+Prioritise European/German signals; only include global signals if highly relevant."""
 
 
 def _signals_to_text(extracted, categories, url_map):
-    """Format extracted signals as a numbered reference block for the synthesis prompt."""
     lines = []
     ref_num = 1
     ref_map = {}
-
     for cat in categories:
         for item in extracted.get(cat, []):
             for src_idx in item.get("sources", []):
@@ -339,25 +404,25 @@ def _signals_to_text(extracted, categories, url_map):
                 if url and (cat, src_idx) not in ref_map:
                     ref_map[(cat, src_idx)] = ref_num
                     ref_num += 1
-
     for cat in categories:
         items = extracted.get(cat, [])
         if not items:
             continue
         lines.append(f"### {cat}")
         for item in items:
-            refs = [ref_map[(cat, s)] for s in item.get("sources", [])
-                    if (cat, s) in ref_map]
+            refs = [ref_map[(cat, s)] for s in item.get("sources", []) if (cat, s) in ref_map]
             ref_str = " ".join(f"[{r}]" for r in refs)
             lines.append(f"- {item['signal']} {ref_str}")
         lines.append("")
-
-    ref_list = ["**Sources:**"]
-    for (cat, idx), num in sorted(ref_map.items(), key=lambda x: x[1]):
-        url = url_map.get((cat, idx), "")
-        ref_list.append(f"[{num}] {url}")
-
     return "\n".join(lines), ref_map
+
+
+def _resolve_urls(sources_list, inv_ref_map, url_map):
+    return [
+        url_map.get(inv_ref_map[s], "")
+        for s in sources_list
+        if s in inv_ref_map and url_map.get(inv_ref_map[s], "")
+    ]
 
 
 def synthesise_report(extracted, url_map, area, products, competitors, users, categories):
@@ -365,147 +430,340 @@ def synthesise_report(extracted, url_map, area, products, competitors, users, ca
         area=area, products=products, competitors=competitors, users=users
     )
     signals_text, ref_map = _signals_to_text(extracted, categories, url_map)
-    user_prompt = f"Market signals:\n\n{signals_text}"
+    user_prompt = f"Market signals from European EV charging industry:\n\n{signals_text}"
 
     try:
-        data = call_groq(system, user_prompt)
+        data = call_groq(system, user_prompt, max_tokens=4000)
     except Exception as e:
         print(f"  synthesis error for {area}: {e}", file=sys.stderr)
-        data = {
-            "trends": [],
-            "competitor_moves": [],
-            "unmet_needs": [],
-            "active_regulations": [],
-            "strategic_implications": [],
-            "open_questions": [],
-        }
+        data = {k: [] for k in ["trends", "competitor_moves", "unmet_needs",
+                                  "active_regulations", "strategic_implications", "open_questions"]}
 
-    # Resolve source indices to URLs using ref_map
     inv_ref_map = {v: k for k, v in ref_map.items()}
 
-    def resolve_item(item):
-        urls = [
-            url_map.get(inv_ref_map[s], "")
-            for s in item.get("sources", [])
-            if s in inv_ref_map and url_map.get(inv_ref_map[s], "")
-        ]
-        return {"text": item.get("text", item.get("title", item.get("description", ""))), "urls": urls}
+    def res(item, *keys):
+        return _resolve_urls(item.get("sources", []), inv_ref_map, url_map)
 
-    def resolve_trend(item):
-        urls = [
-            url_map.get(inv_ref_map[s], "")
-            for s in item.get("sources", [])
-            if s in inv_ref_map and url_map.get(inv_ref_map[s], "")
-        ]
-        return {
-            "title": item.get("title", ""),
-            "description": item.get("description", ""),
-            "urls": urls,
-        }
+    trends = []
+    for t in data.get("trends", [])[:5]:
+        trends.append({
+            "title": t.get("title", ""),
+            "signal": t.get("signal", ""),
+            "meaning": t.get("meaning", ""),
+            "implication": t.get("implication", ""),
+            "urls": res(t),
+        })
+
+    competitor_moves = []
+    for x in data.get("competitor_moves", []):
+        competitor_moves.append({
+            "company": x.get("company", ""),
+            "action": x.get("action", ""),
+            "detail": x.get("detail", x.get("text", "")),
+            "urls": res(x),
+        })
+
+    unmet_needs = []
+    for x in data.get("unmet_needs", []):
+        unmet_needs.append({
+            "need": x.get("need", x.get("text", "")),
+            "evidence": x.get("evidence", ""),
+            "urls": res(x),
+        })
+
+    regulations = []
+    for x in data.get("active_regulations", []):
+        regulations.append({
+            "regulation": x.get("regulation", x.get("text", "")),
+            "status": x.get("status", ""),
+            "impact": x.get("impact", ""),
+            "urls": res(x),
+        })
+
+    implications = []
+    for x in data.get("strategic_implications", []):
+        implications.append({
+            "implication": x.get("implication", x.get("text", "")),
+            "rationale": x.get("rationale", ""),
+            "urls": [],
+        })
+
+    open_questions = [
+        {"text": x.get("text", ""), "urls": []}
+        for x in data.get("open_questions", [])
+    ]
 
     return {
-        "trends": [resolve_trend(t) for t in data.get("trends", [])[:5]],
-        "competitor_moves": [resolve_item(x) for x in data.get("competitor_moves", [])],
-        "unmet_needs": [resolve_item(x) for x in data.get("unmet_needs", [])],
-        "active_regulations": [resolve_item(x) for x in data.get("active_regulations", [])],
-        "strategic_implications": [resolve_item(x) for x in data.get("strategic_implications", [])],
-        "open_questions": [resolve_item(x) for x in data.get("open_questions", [])],
+        "trends": trends,
+        "competitor_moves": competitor_moves,
+        "unmet_needs": unmet_needs,
+        "active_regulations": regulations,
+        "strategic_implications": implications,
+        "open_questions": open_questions,
     }
 
 
 # ---------------------------------------------------------------------------
-# Phase 4a — Build PPTX replacements
+# Phase 4a — Rich PPTX generation
 # ---------------------------------------------------------------------------
 
-def _bullet_list_plain(items):
-    return "\n".join(f"• {item['text']}" for item in items) if items else "No signals found."
+def _clear_and_set_placeholder(slide, idx, text):
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx == idx:
+            ph.text = text
+            return
 
 
-def _trends_plain(trends):
-    lines = []
-    for i, t in enumerate(trends, 1):
-        lines.append(f"{i}. {t['title']}")
-        if t["description"]:
-            lines.append(f"   {t['description']}")
-        lines.append("")
-    return "\n".join(lines).strip() if lines else "No trends found."
+def _rich_body(slide, idx, sections):
+    """
+    Fill body placeholder (idx) with richly formatted sections.
+    sections = list of (label, text, label_color) where label may be None.
+    """
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx != idx:
+            continue
+        tf = ph.text_frame
+        tf.clear()
+        tf.word_wrap = True
 
-
-def build_replacements(fleet_report, site_report, dates):
-    return {
-        "{{GENERATED_AT}}": dates["generated_at"],
-        "{{PERIOD_START}}": dates["period_start"],
-        "{{PERIOD_END}}": dates["period_end"],
-        "{{FLEET_TRENDS}}": _trends_plain(fleet_report["trends"]),
-        "{{FLEET_COMPETITOR_MOVES}}": _bullet_list_plain(fleet_report["competitor_moves"]),
-        "{{FLEET_UNMET_NEEDS}}": _bullet_list_plain(fleet_report["unmet_needs"]),
-        "{{FLEET_ACTIVE_REGULATIONS}}": _bullet_list_plain(fleet_report["active_regulations"]),
-        "{{FLEET_STRATEGIC_IMPLICATIONS}}": _bullet_list_plain(fleet_report["strategic_implications"]),
-        "{{SITE_TRENDS}}": _trends_plain(site_report["trends"]),
-        "{{SITE_COMPETITOR_MOVES}}": _bullet_list_plain(site_report["competitor_moves"]),
-        "{{SITE_UNMET_NEEDS}}": _bullet_list_plain(site_report["unmet_needs"]),
-        "{{SITE_ACTIVE_REGULATIONS}}": _bullet_list_plain(site_report["active_regulations"]),
-        "{{SITE_STRATEGIC_IMPLICATIONS}}": _bullet_list_plain(site_report["strategic_implications"]),
-        "{{OPEN_QUESTIONS}}": _bullet_list_plain(
-            fleet_report["open_questions"] + site_report["open_questions"]
-        ),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Phase 4b — Fill PPTX
-# ---------------------------------------------------------------------------
-
-def consolidate_runs(para):
-    """Merge all runs in a paragraph into the first run to fix split placeholders."""
-    runs = para.runs
-    if len(runs) <= 1:
-        return
-    full_text = "".join(r.text for r in runs)
-    runs[0].text = full_text
-    for run in runs[1:]:
-        run.text = ""
-
-
-def fill_pptx(template_path, output_path, replacements):
-    prs = Presentation(template_path)
-    for slide in prs.slides:
-        for shape in slide.shapes:
-            if not shape.has_text_frame:
+        first = True
+        for label, text, label_color in sections:
+            if not text:
                 continue
+            if label:
+                p = tf.paragraphs[0] if first else tf.add_paragraph()
+                if not first:
+                    p.space_before = Pt(8)
+                r = p.add_run()
+                r.text = label
+                r.font.bold = True
+                r.font.size = Pt(10)
+                r.font.color.rgb = label_color
+                first = False
+
+            p2 = tf.add_paragraph()
+            p2.space_before = Pt(2)
+            r2 = p2.add_run()
+            r2.text = text
+            r2.font.size = Pt(9)
+            r2.font.color.rgb = WHITE
+            first = False
+        return
+
+
+def fill_trend_slide(slide, trend, num, total, area_label):
+    _clear_and_set_placeholder(slide, 0, trend["title"])
+    _clear_and_set_placeholder(slide, 4, f"Trend {num} of {total}  ·  {area_label}")
+    _rich_body(slide, 15, [
+        ("SIGNAL", trend.get("signal", ""), ELLI_GREEN),
+        ("WHAT IT MEANS", trend.get("meaning", ""), ELLI_GREEN),
+        ("ELLI IMPLICATION", trend.get("implication", ""), ELLI_GREEN),
+    ])
+
+
+def fill_competitor_slide(slide, items, subtitle):
+    _clear_and_set_placeholder(slide, 4, subtitle)
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx != 15:
+            continue
+        tf = ph.text_frame
+        tf.clear()
+        tf.word_wrap = True
+        first = True
+        for item in items:
+            p = tf.paragraphs[0] if first else tf.add_paragraph()
+            if not first:
+                p.space_before = Pt(10)
+            r = p.add_run()
+            company = item.get("company", "")
+            action = item.get("action", "")
+            r.text = f"{company}: {action}" if company else action
+            r.font.bold = True
+            r.font.size = Pt(10)
+            r.font.color.rgb = ELLI_GREEN
+            first = False
+
+            detail = item.get("detail", "")
+            if detail:
+                p2 = tf.add_paragraph()
+                p2.space_before = Pt(2)
+                r2 = p2.add_run()
+                r2.text = detail
+                r2.font.size = Pt(9)
+                r2.font.color.rgb = WHITE
+        return
+
+
+def fill_needs_slide(slide, items, subtitle):
+    _clear_and_set_placeholder(slide, 4, subtitle)
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx != 15:
+            continue
+        tf = ph.text_frame
+        tf.clear()
+        tf.word_wrap = True
+        first = True
+        for item in items:
+            p = tf.paragraphs[0] if first else tf.add_paragraph()
+            if not first:
+                p.space_before = Pt(10)
+            r = p.add_run()
+            r.text = f"• {item.get('need', item.get('text', ''))}"
+            r.font.bold = True
+            r.font.size = Pt(10)
+            r.font.color.rgb = ELLI_GREEN
+            first = False
+
+            evidence = item.get("evidence", "")
+            if evidence:
+                p2 = tf.add_paragraph()
+                p2.space_before = Pt(2)
+                r2 = p2.add_run()
+                r2.text = evidence
+                r2.font.size = Pt(9)
+                r2.font.color.rgb = WHITE
+        return
+
+
+def fill_regulations_slide(slide, items, subtitle):
+    _clear_and_set_placeholder(slide, 4, subtitle)
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx != 15:
+            continue
+        tf = ph.text_frame
+        tf.clear()
+        tf.word_wrap = True
+        first = True
+        for item in items:
+            p = tf.paragraphs[0] if first else tf.add_paragraph()
+            if not first:
+                p.space_before = Pt(10)
+            r = p.add_run()
+            reg = item.get("regulation", item.get("text", ""))
+            status = item.get("status", "")
+            r.text = f"▸ {reg}" + (f"  [{status}]" if status else "")
+            r.font.bold = True
+            r.font.size = Pt(10)
+            r.font.color.rgb = ELLI_GREEN
+            first = False
+
+            impact = item.get("impact", "")
+            if impact:
+                p2 = tf.add_paragraph()
+                p2.space_before = Pt(2)
+                r2 = p2.add_run()
+                r2.text = impact
+                r2.font.size = Pt(9)
+                r2.font.color.rgb = WHITE
+        return
+
+
+def fill_implications_slide(slide, items, subtitle):
+    _clear_and_set_placeholder(slide, 4, subtitle)
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx != 15:
+            continue
+        tf = ph.text_frame
+        tf.clear()
+        tf.word_wrap = True
+        first = True
+        for item in items:
+            p = tf.paragraphs[0] if first else tf.add_paragraph()
+            if not first:
+                p.space_before = Pt(10)
+            r = p.add_run()
+            r.text = f"→ {item.get('implication', item.get('text', ''))}"
+            r.font.bold = True
+            r.font.size = Pt(10)
+            r.font.color.rgb = ELLI_GREEN
+            first = False
+
+            rationale = item.get("rationale", "")
+            if rationale:
+                p2 = tf.add_paragraph()
+                p2.space_before = Pt(2)
+                r2 = p2.add_run()
+                r2.text = rationale
+                r2.font.size = Pt(9)
+                r2.font.color.rgb = WHITE
+        return
+
+
+def fill_pptx(template_path, output_path, fleet_report, site_report, dates):
+    """Fill the 22-slide template with rich formatted content."""
+    prs = Presentation(template_path)
+    slides = list(prs.slides)
+    period = f"{dates['period_start']} – {dates['period_end']}"
+
+    # Slide 0: Cover — simple text replace
+    for shape in slides[0].shapes:
+        if shape.has_text_frame:
             for para in shape.text_frame.paragraphs:
-                consolidate_runs(para)
                 for run in para.runs:
-                    for key, value in replacements.items():
-                        if key in run.text:
-                            run.text = run.text.replace(key, value)
+                    run.text = run.text.replace("{{GENERATED_AT}}", dates["generated_at"])
+                    run.text = run.text.replace("{{PERIOD_START}}", dates["period_start"])
+                    run.text = run.text.replace("{{PERIOD_END}}", dates["period_end"])
+
+    # Slides 2–6: Fleet Trends (individual)
+    for i, trend in enumerate(fleet_report["trends"][:5]):
+        fill_trend_slide(slides[2 + i], trend, i + 1, 5, "Fleet Mobility Management")
+
+    # Slide 7: Fleet Competitor Moves
+    fill_competitor_slide(slides[7], fleet_report["competitor_moves"], period)
+
+    # Slide 8: Fleet Unmet Needs
+    fill_needs_slide(slides[8], fleet_report["unmet_needs"], period)
+
+    # Slide 9: Fleet Active Regulations
+    fill_regulations_slide(slides[9], fleet_report["active_regulations"], period)
+
+    # Slide 10: Fleet Strategic Implications
+    fill_implications_slide(slides[10], fleet_report["strategic_implications"], period)
+
+    # Slides 12–16: Site Trends (individual)
+    for i, trend in enumerate(site_report["trends"][:5]):
+        fill_trend_slide(slides[12 + i], trend, i + 1, 5, "Charging Site Management")
+
+    # Slide 17: Site Competitor Moves
+    fill_competitor_slide(slides[17], site_report["competitor_moves"], period)
+
+    # Slide 18: Site Unmet Needs
+    fill_needs_slide(slides[18], site_report["unmet_needs"], period)
+
+    # Slide 19: Site Active Regulations
+    fill_regulations_slide(slides[19], site_report["active_regulations"], period)
+
+    # Slide 20: Site Strategic Implications
+    fill_implications_slide(slides[20], site_report["strategic_implications"], period)
+
+    # Slide 21: Open Questions
+    all_questions = fleet_report["open_questions"] + site_report["open_questions"]
+    for ph in slides[21].placeholders:
+        if ph.placeholder_format.idx == 15:
+            tf = ph.text_frame
+            tf.clear()
+            tf.word_wrap = True
+            first = True
+            for q in all_questions:
+                p = tf.paragraphs[0] if first else tf.add_paragraph()
+                p.space_before = Pt(4)
+                r = p.add_run()
+                r.text = f"? {q.get('text', '')}"
+                r.font.size = Pt(10)
+                r.font.color.rgb = WHITE
+                first = False
+
     prs.save(output_path)
 
 
 # ---------------------------------------------------------------------------
-# Phase 4c — Generate Markdown
+# Phase 4b — Generate Markdown
 # ---------------------------------------------------------------------------
 
 def _cite(urls):
     if not urls:
         return ""
     return " " + " ".join(f"[[{i+1}]]({u})" for i, u in enumerate(urls) if u)
-
-
-def _bullet_list_md(items):
-    if not items:
-        return "- No signals found.\n"
-    return "".join(f"- {item['text']}{_cite(item['urls'])}\n" for item in items)
-
-
-def _trends_md(trends):
-    lines = []
-    for i, t in enumerate(trends, 1):
-        lines.append(f"{i}. **{t['title']}**{_cite(t['urls'])}")
-        if t["description"]:
-            lines.append(f"   {t['description']}")
-        lines.append("")
-    return "\n".join(lines) if lines else "- No trends found.\n"
 
 
 def _sources_section(report, area_label):
@@ -531,60 +789,108 @@ def generate_markdown(fleet_report, site_report, dates):
     period = f"{dates['period_start']} – {dates['period_end']}"
     today = dates["end"].strftime("%Y-%m-%d")
 
-    sections = [
+    lines = [
         f"# Elli Market Signals — {label}",
-        f"*Research period: {period} | Generated: {today}*",
+        f"*Research period: {period} | Generated: {today} | Geographic focus: Germany & Europe*",
         "",
         "---",
         "",
         "## Fleet Mobility Management",
         "",
         "### Top 5 Trends",
-        _trends_md(fleet_report["trends"]),
-        "### Competitor Moves",
-        _bullet_list_md(fleet_report["competitor_moves"]),
         "",
-        "### Unmet Customer Needs",
-        _bullet_list_md(fleet_report["unmet_needs"]),
-        "",
-        "### Active Regulations",
-        _bullet_list_md(fleet_report["active_regulations"]),
-        "",
-        "### Strategic Implications for Elli",
-        _bullet_list_md(fleet_report["strategic_implications"]),
-        "",
-        "---",
-        "",
-        "## Charging Site Management",
-        "",
-        "### Top 5 Trends",
-        _trends_md(site_report["trends"]),
-        "### Competitor Moves",
-        _bullet_list_md(site_report["competitor_moves"]),
-        "",
-        "### Unmet Customer Needs",
-        _bullet_list_md(site_report["unmet_needs"]),
-        "",
-        "### Active Regulations",
-        _bullet_list_md(site_report["active_regulations"]),
-        "",
-        "### Strategic Implications for Elli",
-        _bullet_list_md(site_report["strategic_implications"]),
-        "",
-        "---",
-        "",
-        "## Open Questions",
-        _bullet_list_md(fleet_report["open_questions"] + site_report["open_questions"]),
-        "",
-        "---",
-        "",
-        "## Sources",
-        "",
-        _sources_section(fleet_report, "Fleet Mobility Management"),
-        "",
-        _sources_section(site_report, "Charging Site Management"),
     ]
-    return "\n".join(sections)
+
+    for i, t in enumerate(fleet_report["trends"], 1):
+        lines.append(f"#### {i}. {t['title']}{_cite(t['urls'])}")
+        if t.get("signal"):
+            lines.append(f"**Signal:** {t['signal']}")
+        if t.get("meaning"):
+            lines.append(f"**What it means:** {t['meaning']}")
+        if t.get("implication"):
+            lines.append(f"**Elli implication:** {t['implication']}")
+        lines.append("")
+
+    lines += ["### Competitor Moves", ""]
+    for x in fleet_report["competitor_moves"]:
+        company = x.get("company", "")
+        action = x.get("action", "")
+        detail = x.get("detail", "")
+        header = f"**{company}:** {action}" if company else f"**{action}**"
+        lines.append(f"- {header}{_cite(x['urls'])}")
+        if detail:
+            lines.append(f"  {detail}")
+
+    lines += ["", "### Unmet Customer Needs", ""]
+    for x in fleet_report["unmet_needs"]:
+        lines.append(f"- **{x.get('need', '')}**{_cite(x['urls'])}")
+        if x.get("evidence"):
+            lines.append(f"  {x['evidence']}")
+
+    lines += ["", "### Active Regulations", ""]
+    for x in fleet_report["active_regulations"]:
+        status = f" [{x['status']}]" if x.get("status") else ""
+        lines.append(f"- **{x.get('regulation', '')}**{status}{_cite(x['urls'])}")
+        if x.get("impact"):
+            lines.append(f"  {x['impact']}")
+
+    lines += ["", "### Strategic Implications for Elli", ""]
+    for x in fleet_report["strategic_implications"]:
+        lines.append(f"- **{x.get('implication', '')}**")
+        if x.get("rationale"):
+            lines.append(f"  {x['rationale']}")
+
+    lines += ["", "---", "", "## Charging Site Management", "", "### Top 5 Trends", ""]
+
+    for i, t in enumerate(site_report["trends"], 1):
+        lines.append(f"#### {i}. {t['title']}{_cite(t['urls'])}")
+        if t.get("signal"):
+            lines.append(f"**Signal:** {t['signal']}")
+        if t.get("meaning"):
+            lines.append(f"**What it means:** {t['meaning']}")
+        if t.get("implication"):
+            lines.append(f"**Elli implication:** {t['implication']}")
+        lines.append("")
+
+    lines += ["### Competitor Moves", ""]
+    for x in site_report["competitor_moves"]:
+        company = x.get("company", "")
+        action = x.get("action", "")
+        detail = x.get("detail", "")
+        header = f"**{company}:** {action}" if company else f"**{action}**"
+        lines.append(f"- {header}{_cite(x['urls'])}")
+        if detail:
+            lines.append(f"  {detail}")
+
+    lines += ["", "### Unmet Customer Needs", ""]
+    for x in site_report["unmet_needs"]:
+        lines.append(f"- **{x.get('need', '')}**{_cite(x['urls'])}")
+        if x.get("evidence"):
+            lines.append(f"  {x['evidence']}")
+
+    lines += ["", "### Active Regulations", ""]
+    for x in site_report["active_regulations"]:
+        status = f" [{x['status']}]" if x.get("status") else ""
+        lines.append(f"- **{x.get('regulation', '')}**{status}{_cite(x['urls'])}")
+        if x.get("impact"):
+            lines.append(f"  {x['impact']}")
+
+    lines += ["", "### Strategic Implications for Elli", ""]
+    for x in site_report["strategic_implications"]:
+        lines.append(f"- **{x.get('implication', '')}**")
+        if x.get("rationale"):
+            lines.append(f"  {x['rationale']}")
+
+    lines += ["", "---", "", "## Open Questions", ""]
+    for q in fleet_report["open_questions"] + site_report["open_questions"]:
+        lines.append(f"- {q.get('text', '')}")
+
+    lines += ["", "---", "", "## Sources", "",
+              _sources_section(fleet_report, "Fleet Mobility Management"),
+              "",
+              _sources_section(site_report, "Charging Site Management")]
+
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -592,19 +898,13 @@ def generate_markdown(fleet_report, site_report, dates):
 # ---------------------------------------------------------------------------
 
 def commit_markdown(md_path, label):
-    """Commit the MD report to the repo and push; returns the GitHub blob URL."""
     repo_root = Path(__file__).parent
     token = os.getenv("GITHUB_TOKEN", "")
-
     try:
         subprocess.run(["git", "config", "user.email", "pipeline@elli-market-signals"], check=True, cwd=repo_root)
         subprocess.run(["git", "config", "user.name", "Market Signals Pipeline"], check=True, cwd=repo_root)
         subprocess.run(["git", "add", str(md_path)], check=True, cwd=repo_root)
-        subprocess.run(
-            ["git", "commit", "-m", f"report: add market signals {label}"],
-            check=True, cwd=repo_root
-        )
-        # Inject token into remote URL for push
+        subprocess.run(["git", "commit", "-m", f"report: market signals {label}"], check=True, cwd=repo_root)
         result = subprocess.run(["git", "remote", "get-url", "origin"],
                                  capture_output=True, text=True, cwd=repo_root)
         remote_url = result.stdout.strip()
@@ -613,12 +913,10 @@ def commit_markdown(md_path, label):
             subprocess.run(["git", "push", auth_url, "HEAD"], check=True, cwd=repo_root)
         else:
             subprocess.run(["git", "push", "-u", "origin", "HEAD"], check=True, cwd=repo_root)
-
-        # Derive GitHub URL from remote
         clean_url = remote_url.replace(".git", "")
         branch = subprocess.run(["git", "branch", "--show-current"],
                                   capture_output=True, text=True, cwd=repo_root).stdout.strip()
-        return f"{clean_url}/blob/{branch}/{md_path.name}"
+        return f"{clean_url}/blob/{branch}/reports/{md_path.name}"
     except subprocess.CalledProcessError as e:
         print(f"  git error: {e}", file=sys.stderr)
         return ""
@@ -628,36 +926,18 @@ def post_to_slack(pptx_path, md_path, github_url):
     token = os.environ["SLACK_BOT_TOKEN"]
     channel = os.environ["SLACK_CHANNEL_ID"]
     headers = {"Authorization": f"Bearer {token}"}
-
-    message = (
-        f":bar_chart: *Elli Market Signals report is ready!*\n"
-        f"Research period: see attached files.\n"
-    )
+    message = ":bar_chart: *Elli Market Signals report is ready!*\n"
     if github_url:
-        message += f":link: <{github_url}|View full report with citations on GitHub>"
-
-    # Post text message
-    resp = requests.post(
-        "https://slack.com/api/chat.postMessage",
-        headers=headers,
-        json={"channel": channel, "text": message},
-    )
-    resp.raise_for_status()
-    if not resp.json().get("ok"):
-        print(f"  Slack message error: {resp.json()}", file=sys.stderr)
-
-    # Upload PPTX
-    for fpath, fname in [(pptx_path, "Market Signals Report.pptx"),
-                          (md_path, f"{md_path.name}")]:
+        message += f":link: <{github_url}|View full cited report on GitHub>"
+    requests.post("https://slack.com/api/chat.postMessage",
+                  headers=headers, json={"channel": channel, "text": message}).raise_for_status()
+    for fpath, fname in [(pptx_path, "Market Signals Report.pptx"), (md_path, md_path.name)]:
         if not fpath.exists():
             continue
         with open(fpath, "rb") as f:
-            resp = requests.post(
-                "https://slack.com/api/files.upload",
-                headers=headers,
-                data={"channels": channel, "filename": fname},
-                files={"file": (fname, f)},
-            )
+            resp = requests.post("https://slack.com/api/files.upload", headers=headers,
+                                  data={"channels": channel, "filename": fname},
+                                  files={"file": (fname, f)})
         resp.raise_for_status()
         if not resp.json().get("ok"):
             print(f"  Slack upload error for {fname}: {resp.json()}", file=sys.stderr)
@@ -676,52 +956,43 @@ def main():
     print(f"Research window: {dates['period_start']} to {dates['period_end']}")
     print(f"DRY_RUN={dry_run}")
 
-    # --- Phase 1: Research ---
     print("\n[Phase 1] Running searches...")
     print("  Fleet categories:")
-    fleet_raw = run_searches(FLEET_CATEGORIES, dates["month_range"])
+    fleet_raw = run_searches(FLEET_CATEGORIES, FLEET_COMPETITOR_QUERIES, dates["month_range"])
     print("  Site categories:")
-    site_raw = run_searches(SITE_CATEGORIES, dates["month_range"])
+    site_raw = run_searches(SITE_CATEGORIES, SITE_COMPETITOR_QUERIES, dates["month_range"])
 
     fleet_url_map = build_url_map(fleet_raw)
     site_url_map = build_url_map(site_raw)
 
-    # --- Phase 2: Extract ---
     print("\n[Phase 2] Extracting signals...")
     print("  Fleet:")
     fleet_extracted = extract_signals(fleet_raw, batch_size=4)
     print("  Site:")
     site_extracted = extract_signals(site_raw, batch_size=4)
 
-    # --- Phase 3: Synthesise ---
     print("\n[Phase 3] Synthesising report...")
     print("  Fleet report...")
     fleet_report = synthesise_report(
         fleet_extracted, fleet_url_map,
         area="Fleet Mobility Management",
-        products=FLEET_PRODUCTS,
-        competitors=FLEET_COMPETITORS,
-        users=FLEET_USERS,
+        products=FLEET_PRODUCTS, competitors=FLEET_COMPETITORS, users=FLEET_USERS,
         categories=[c for c, _ in FLEET_CATEGORIES],
     )
     print("  Site report...")
     site_report = synthesise_report(
         site_extracted, site_url_map,
         area="Charging Site Management",
-        products=SITE_PRODUCTS,
-        competitors=SITE_COMPETITORS,
-        users=SITE_USERS,
+        products=SITE_PRODUCTS, competitors=SITE_COMPETITORS, users=SITE_USERS,
         categories=[c for c, _ in SITE_CATEGORIES],
     )
 
-    # --- Phase 4: Generate outputs ---
     print("\n[Phase 4] Generating outputs...")
     pptx_path = Path(f"output_{label}.pptx")
     md_path = Path("reports") / f"output_{label}.md"
     md_path.parent.mkdir(exist_ok=True)
 
-    replacements = build_replacements(fleet_report, site_report, dates)
-    fill_pptx("template.pptx", str(pptx_path), replacements)
+    fill_pptx("template.pptx", str(pptx_path), fleet_report, site_report, dates)
     print(f"  ✓ PPTX: {pptx_path}")
 
     md_content = generate_markdown(fleet_report, site_report, dates)
@@ -729,18 +1000,14 @@ def main():
     print(f"  ✓ MD: {md_path}")
 
     if dry_run:
-        print("\n[DRY RUN] Skipping git commit and Slack post.")
-        print(f"  Artifacts: {pptx_path}, {md_path}")
+        print(f"\n[DRY RUN] Artifacts: {pptx_path}, {md_path}")
         return
 
-    # --- Phase 5: Commit + notify ---
     print("\n[Phase 5] Committing MD and posting to Slack...")
     github_url = commit_markdown(md_path, label)
     print(f"  GitHub URL: {github_url or '(push failed)'}")
-
     post_to_slack(pptx_path, md_path, github_url)
     print("  ✓ Posted to Slack")
-
     print(f"\n=== Done — {dates['generated_at']} ===")
 
 
