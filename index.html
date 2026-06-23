@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ankita Menon — Portfolio (v2, Option E accents)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --void: #0a0a0a;
+  --paper: #fbfaf8;
+  --mute: #9a9a9a;
+  --line-dark: rgba(255,255,255,0.08);
+
+  --cobalt: #2D5FFF;
+  --cobalt-light: #5B86FF;
+  --cobalt-fill: rgba(45,95,255,0.12);
+  --cobalt-border: rgba(91,134,255,0.35);
+
+  --lime: #C8FF4D;
+  --lime-fill: rgba(200,255,77,0.12);
+  --lime-border: rgba(200,255,77,0.35);
+
+  --pink: #FF5BAA;
+  --pink-fill: rgba(255,45,140,0.12);
+  --pink-border: rgba(255,91,170,0.35);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--void);
+  color: var(--paper);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 64px; }
+@media (max-width: 640px){ .wrap{ padding: 0 24px; } }
+
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 24px; display: flex; align-items: center; gap: 8px;
+}
+.eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* color utility classes — accent set per section */
+.accent-cobalt { color: var(--cobalt-light); }
+.accent-lime { color: var(--lime); }
+.accent-pink { color: var(--pink); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 8px; border-radius: 8px;
+  padding: 6px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  margin-bottom: 18px;
+}
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+.pill-cobalt { background: var(--cobalt-fill); border: 1px solid var(--cobalt-border); color: var(--cobalt-light); }
+.pill-cobalt .dot { background: var(--cobalt-light); }
+.pill-lime { background: var(--lime-fill); border: 1px solid var(--lime-border); color: var(--lime); }
+.pill-lime .dot { background: var(--lime); }
+.pill-pink { background: var(--pink-fill); border: 1px solid var(--pink-border); color: var(--pink); }
+.pill-pink .dot { background: var(--pink); }
+.pill-mute { background: transparent; border: 1px solid var(--mute); color: var(--mute); }
+.pill-mute .dot { background: var(--mute); }
+
+/* ---- top nav ---- */
+nav.topnav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,10,10,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line-dark);
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 64px;
+}
+nav.topnav .id { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 15px; color: var(--paper); }
+nav.topnav .links { display: flex; gap: 32px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; letter-spacing: 0.04em; color: var(--mute); }
+nav.topnav .links a { color: var(--mute); text-decoration: none; }
+nav.topnav .links a:hover { color: var(--paper); }
+@media (max-width: 640px){ nav.topnav{ padding: 16px 24px; } nav.topnav .links{ gap: 16px; font-size: 11px; } }
+
+/* ---- hero (cobalt home base) ---- */
+.hero { padding: 130px 0 100px; border-bottom: 1px solid var(--line-dark); }
+.hero h1 {
+  font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800;
+  font-size: clamp(40px, 5.6vw, 68px); line-height: 1.1; letter-spacing: -0.02em; max-width: 920px;
+}
+.hero h1 em { font-style: normal; color: var(--cobalt-light); }
+.hero .subtitle { font-size: 17px; color: #9a988f; max-width: 600px; line-height: 1.6; margin-top: 24px; }
+.hero-meta { display: flex; gap: 36px; margin-top: 44px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--mute); }
+.hero-meta span.k { display:block; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; margin-bottom: 6px; color: #6f6f6f; }
+.cta-row { display: flex; gap: 14px; margin-top: 44px; }
+.btn { font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 13px 26px; border-radius: 4px; text-decoration: none; letter-spacing: 0.03em; }
+.btn-primary { background: var(--cobalt); color: var(--paper); font-weight: 500; }
+.btn-primary:hover { background: var(--cobalt-light); }
+.btn-ghost { border: 1px solid var(--line-dark); color: var(--paper); }
+.btn-ghost:hover { border-color: var(--cobalt-light); color: var(--cobalt-light); }
+
+/* ---- section shell ---- */
+.section { padding: 110px 0; border-bottom: 1px solid var(--line-dark); }
+.section .head { max-width: 640px; margin-bottom: 56px; }
+.section h2 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 40px; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 18px; }
+.section .lede { font-size: 16px; line-height: 1.7; color: #9a988f; max-width: 560px; }
+
+/* ---- case cards ---- */
+.case {
+  border: 1px solid var(--line-dark); border-radius: 14px; padding: 40px; margin-bottom: 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; flex-wrap: wrap;
+}
+.case h3 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 26px; line-height: 1.2; margin-bottom: 12px; max-width: 480px; }
+.case p { color: #9a988f; font-size: 15px; line-height: 1.65; max-width: 460px; }
+.case.placeholder { border-style: dashed; opacity: 0.6; }
+.case.placeholder h3 { color: #cfcfcf; }
+
+.case-link { font-family: 'JetBrains Mono', monospace; font-size: 13px; text-decoration: none; white-space: nowrap; }
+.case-link.cobalt { color: var(--cobalt-light); }
+.case-link.cobalt:hover { color: var(--paper); }
+.case-link.lime { color: var(--lime); }
+.case-link.lime:hover { color: var(--paper); }
+.case-link.pink { color: var(--pink); }
+.case-link.pink:hover { color: var(--paper); }
+.case-link.mute { color: var(--mute); }
+
+/* ---- stat readout (lime section) ---- */
+.stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--line-dark); border: 1px solid var(--line-dark); border-radius: 14px; overflow: hidden; }
+.stat { background: var(--void); padding: 40px 30px; }
+.stat .num { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 50px; color: var(--lime); line-height: 1; }
+.stat .label { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; letter-spacing: 0.06em; color: var(--mute); text-transform: uppercase; margin-top: 16px; }
+.stat .desc { font-size: 13.5px; color: #9a988f; line-height: 1.6; margin-top: 14px; }
+@media (max-width: 760px){ .stats{ grid-template-columns: 1fr; } }
+
+/* ---- design grid (pink section) ---- */
+.design-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+@media (max-width: 900px){ .design-grid{ grid-template-columns: 1fr; } }
+.design-card {
+  border: 1px solid var(--line-dark); border-radius: 14px; padding: 30px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  display: flex; flex-direction: column;
+}
+.design-card .tag { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.05em; color: var(--pink); text-transform: uppercase; margin-bottom: 14px; }
+.design-card h4 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 20px; margin-bottom: 10px; line-height: 1.25; }
+.design-card p { color: #9a988f; font-size: 13.5px; line-height: 1.6; flex-grow: 1; }
+.design-card .case-link { display: inline-block; margin-top: 18px; }
+
+/* ---- about ---- */
+.about-body { font-size: 17px; line-height: 1.75; color: #c9c7c0; max-width: 600px; }
+.about-body + .about-body { margin-top: 18px; }
+
+/* ---- footer (cobalt home base) ---- */
+footer.cta-band { background: var(--cobalt); padding: 80px 0; }
+footer.cta-band .wrap { display: flex; flex-direction: column; align-items: flex-start; }
+footer.cta-band h2 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 38px; margin-bottom: 14px; letter-spacing: -0.01em; }
+footer.cta-band p { font-size: 15px; color: rgba(251,250,248,0.85); margin-bottom: 30px; }
+footer.cta-band .btn-primary { background: var(--paper); color: var(--cobalt); }
+footer.cta-band .btn-ghost { border-color: rgba(251,250,248,0.4); color: var(--paper); }
+footer.cta-band .btn-ghost:hover{ border-color: var(--paper); }
+
+footer.meta {
+  background: var(--void); padding: 28px 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--mute);
+  display: flex; justify-content: space-between;
+}
+@media (max-width: 640px){ footer.meta .wrap{ flex-direction: column; gap: 8px; } }
+
+/* ---- embedded case study (Vasana) ---- */
+.case-study-page { border-top: 1px solid var(--line-dark); }
+.cs-hero { padding: 110px 0 60px; border-bottom: 1px solid var(--line-dark); }
+.cs-hero h1 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: clamp(38px, 6vw, 60px); line-height: 1.05; margin-bottom: 20px; max-width: 680px; }
+.cs-hero .lede { font-size: 18px; line-height: 1.6; color: var(--mute); max-width: 560px; margin-bottom: 36px; }
+.meta-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; border-top: 1px solid var(--line-dark); padding-top: 24px; margin-bottom: 36px; }
+.meta-row .item .label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); margin-bottom: 6px; }
+.meta-row .item .value { font-size: 14.5px; color: var(--paper); line-height: 1.4; }
+@media (max-width: 640px){ .meta-row{ grid-template-columns: repeat(2, 1fr); gap: 18px 16px; } }
+.proof-strip { display: flex; flex-wrap: wrap; gap: 12px; }
+.proof-pill { display: inline-flex; align-items: center; gap: 8px; border-radius: 8px; padding: 8px 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--pink-fill); border: 1px solid var(--pink-border); color: var(--pink); }
+.proof-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pink); }
+.cs-hero-image { margin-top: 48px; }
+.cs-hero-image img { width: 100%; display: block; border-radius: 10px; border: 1px solid var(--line-dark); }
+.cs-section { padding: 72px 0; border-bottom: 1px solid var(--line-dark); }
+.cs-section-num { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--pink); margin-bottom: 16px; }
+.cs-section h2 { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: clamp(26px, 3.6vw, 36px); margin-bottom: 18px; max-width: 600px; }
+.cs-section .lede { font-size: 16px; line-height: 1.7; color: var(--mute); max-width: 620px; }
+.cs-section .lede + .lede { margin-top: 14px; }
+.cs-pullquote { margin-top: 28px; padding: 20px 24px; border-left: 2px solid var(--pink); font-family: 'Bricolage Grotesque', sans-serif; font-size: 17px; font-style: italic; color: var(--paper); max-width: 540px; }
+.cs-pullquote span { display: block; margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-style: normal; font-size: 11.5px; color: var(--mute); }
+.beats-visual { margin-top: 32px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+.beat-card { background: rgba(255,255,255,0.02); border: 1px solid var(--line-dark); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; min-height: 260px; }
+.beat-card-num { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--pink); margin-bottom: 14px; }
+.beat-card h4 { font-size: 22px; margin-bottom: 12px; color: var(--paper); }
+.beat-card p { font-size: 15px; line-height: 1.6; color: var(--mute); margin-bottom: 18px; max-width: 460px; }
+.cs-chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.cs-chip { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 5px 9px; border-radius: 6px; border: 1px solid var(--line-dark); color: var(--mute); }
+.beat-card.has-img img { width: 100%; border-radius: 10px; margin-top: auto; border: 1px solid var(--line-dark); display: block; }
+.beat-card.has-img { padding-bottom: 22px; }
+@media (max-width: 640px){ .beats-visual{ grid-template-columns: 1fr; } }
+.work-block { margin-top: 32px; }
+.work-block img { width: 100%; border-radius: 12px; border: 1px solid var(--line-dark); display: block; background: #fff; }
+.then-now { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.then-now .col .col-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); margin-bottom: 14px; }
+.then-now .col ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.then-now .col li { font-size: 14.5px; line-height: 1.55; color: var(--mute); padding-left: 16px; position: relative; }
+.then-now .col li::before { content: '—'; position: absolute; left: 0; color: var(--mute); }
+.then-now .col.now li::before { color: var(--pink); }
+@media (max-width: 640px){ .then-now{ grid-template-columns: 1fr; gap: 28px; } }
+.stats-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px){ .stats-4{ grid-template-columns: 1fr 1fr; } }
+.cs-back-link { display: inline-block; margin-top: 18px; }
+
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a href="#" class="id" style="text-decoration:none;">Ankita Menon</a>
+  <div class="links"><a href="#work">work</a><a href="#design">design</a><a href="#pm">product mgmt</a><a href="#about">about</a><a href="#contact">contact</a></div>
+</nav>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="eyebrow accent-cobalt"><span class="dot" style="background:var(--cobalt-light);"></span>Open to AI-native B2B SaaS opportunities</div>
+    <h1>Designs the system.<br>Owns the <em>outcome.</em></h1>
+    <p class="subtitle">AI Product Generalist — Product Manager with UX Design Expertise. Trained as a lead product designer, sharpened by early-stage innovation work, proven across enterprise B2B SaaS product management.</p>
+    <div class="hero-meta">
+      <div><span class="k">Currently</span>Product Manager, Elli (VW Group)</div>
+      <div><span class="k">Based in</span>Berlin</div>
+    </div>
+    <div class="cta-row">
+      <a href="#" class="btn btn-primary">View résumé</a>
+      <a href="#" class="btn btn-ghost">Get in touch</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PEEC AI — COBALT ===== -->
+<section class="section" id="work">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow accent-cobalt"><span class="dot" style="background:var(--cobalt-light);"></span>Selected work — 01</div>
+      <h2>Peec AI</h2>
+      <p class="lede">Peec AI is shipping fast — chats, agent analytics, AI shopping, all in months, not years. I spent a few hours in their dashboard and couldn't stop pulling at one thread: navigation.</p>
+    </div>
+
+    <div class="case">
+      <div>
+        <div class="pill pill-cobalt"><span class="dot"></span>Self-initiated · Live audit</div>
+        <h3>Every feature gets a seat at the table</h3>
+        <p>A teardown of what happens to navigation when a product grows fast — diagnosed where Peec's IA breaks under feature growth, then designed and prototyped a fix.</p>
+      </div>
+      <a href="#" class="case-link cobalt">View case study →</a>
+    </div>
+
+    <div class="case placeholder">
+      <div>
+        <div class="pill pill-mute"><span class="dot"></span>In progress</div>
+        <h3>Insights without action are just dashboards</h3>
+        <p>Closing the Insights → Actions gap — how products like Prismic turn raw insight into a clear next step.</p>
+      </div>
+      <a href="#" class="case-link mute">Drafting →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PRODUCT DESIGN — PINK (THE FOUNDATION) ===== -->
+<section class="section" id="design">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow accent-pink"><span class="dot" style="background:var(--pink);"></span>The foundation — 02</div>
+      <h2>Platforms <span class="accent-pink">built</span></h2>
+      <p class="lede">Before anything else, I learned to design — research, IA, visual systems, and the final pixel, end-to-end, across 10+ shipped platforms.</p>
+    </div>
+
+    <div class="design-grid">
+      <div class="design-card">
+        <div class="tag">Now live · 27,400+ members</div>
+        <h4>Vasana, Behavioral Genome</h4>
+        <p>End-to-end design and product strategy for an AI-driven behavioral health platform — now live, trusted by EY, Accenture, and Starbucks.</p>
+        <a href="vasana-case-study.html" class="case-link pink">View case study →</a>
+      </div>
+      <div class="design-card">
+        <div class="tag">Lead Product Designer, 2022–24</div>
+        <h4>yuj, a global design company</h4>
+        <p>Spotted the gap in yuj's own website and led the fix — working directly with the CEO and CDO to rethink its IA and content strategy for real organic reach.</p>
+        <a href="https://www.yujdesigns.com/" class="case-link pink">Visit yuj.com →</a>
+      </div>
+      <div class="design-card">
+        <div class="tag">Case study</div>
+        <h4>SmartSwipe</h4>
+        <p>A banking journey personalized to you — designed end-to-end for a fintech context.</p>
+        <a href="#" class="case-link pink">View case study →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PRODUCT MANAGEMENT — LIME (WHERE IT PAYS OFF) ===== -->
+<section class="section" id="pm">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow accent-lime"><span class="dot" style="background:var(--lime);"></span>Where it pays off — 03</div>
+      <h2>Elli, <span class="accent-lime">Volkswagen Group</span></h2>
+      <p class="lede">Design thinking doesn't stop at the screen. At Elli, I took it into fraud systems, account activation, and the calls that move a P&amp;L.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="num">83%</div>
+        <div class="label">Fraud detection</div>
+        <div class="desc">Reduction in investigation time via an AI-assisted detection initiative, coordinated across Engineering, Legal, and Operations.</div>
+      </div>
+      <div class="stat">
+        <div class="num">15%</div>
+        <div class="label">Account activation</div>
+        <div class="desc">Lift in first-card completions, from a multi-touchpoint program targeting 900+ dormant accounts.</div>
+      </div>
+      <div class="stat">
+        <div class="num">30%</div>
+        <div class="label">Competitive intel</div>
+        <div class="desc">Cut in leadership time-to-insight via an AI dashboard tracking 15+ competitors across 5+ markets.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===== ABOUT — NEUTRAL ===== -->
+<section class="section" id="about">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow accent-cobalt"><span class="dot" style="background:var(--cobalt-light);"></span>About — 04</div>
+      <h2>A bit about <em style="color:var(--cobalt-light); font-style:normal;">me</em></h2>
+    </div>
+    <p class="about-body">I think about products the way I think about design — as systems that either earn someone's trust or lose it in the first five seconds. I started as a designer because I wanted to make things people actually want to use, and moved into product management because I wanted to own why those things existed in the first place.</p>
+    <p class="about-body">Outside of work: chasing good light for photos, finding the next city to explore, and always hunting for a new dish to try.</p>
+  </div>
+</section>
+
+<footer class="cta-band" id="contact">
+  <div class="wrap">
+    <h2>Let's talk</h2>
+    <p>Open to Product Management and Product Design roles — happiest at the intersection of both.</p>
+    <div class="cta-row">
+      <a href="#" class="btn btn-primary">Email</a>
+      <a href="#" class="btn btn-ghost">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<footer class="meta">
+  <div class="wrap">
+    <span>Berlin, DE</span>
+    <span>© 2026 Ankita Menon</span>
+  </div>
+</footer>
+
+</body>
+</html>
